@@ -1,0 +1,34 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/player",
+    "crates/camera"
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+
+[workspace.dependencies]
+bevy = { version = "0.20.0", features = []}
+
+player = { path = "crates/player" }
+
+[package]
+name = "bevy_tests"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "bevy_tests"
+path = "src/main.rs"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[dependencies]
+bevy = { workspace = true }
+player = { workspace = true }
