@@ -5,3 +5,4 @@ edition.workspace = true
 
 [dependencies]
 bevy = { workspace = true, features = ["gltf_animation", "pan_orbit_camera", "bevy_camera_controller"] }
+camera = { workspace= true }

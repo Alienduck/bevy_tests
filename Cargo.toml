@@ -13,6 +13,7 @@ edition = "2024"
 bevy = { version = "0.20.0", features = []}
 
 player = { path = "crates/player" }
+camera = { path = "crates/camera"}
 
 [package]
 name = "bevy_tests"
