@@ -24,12 +24,17 @@ pub struct PlayerAnimations {
     pub run: AnimationNodeIndex,
 }
 
+#[derive(Component)]
+pub struct CustomPlayerTexture {
+    pub texture: Handle<Image>,
+}
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(camera::SmartCameraPlugin)
-            .add_systems(Startup, setup_player)
+            .add_systems(Startup, (setup_player, debug_gltf_animations).chain())
             .add_systems(Update, (move_player, update_animations).chain());
     }
 }
@@ -41,12 +46,12 @@ fn setup_player(
 ) {
     let (graph, nodes) = AnimationGraph::from_clips([
         asset_server
-            .load(GltfAssetLabel::Animation(0).from_asset("animations/Rig_Large_General.glb")),
+            .load(GltfAssetLabel::Animation(3).from_asset("animations/Rig_Large_General.glb")),
         asset_server.load(
-            GltfAssetLabel::Animation(1).from_asset("animations/Rig_Large_MovementBasic.glb"),
+            GltfAssetLabel::Animation(2).from_asset("animations/Rig_Large_MovementBasic.glb"),
         ),
         asset_server.load(
-            GltfAssetLabel::Animation(2).from_asset("animations/Rig_Large_MovementAdvanced.glb"),
+            GltfAssetLabel::Animation(0).from_asset("animations/Rig_Large_MovementBasic.glb"),
         ),
     ]);
 
@@ -57,17 +62,23 @@ fn setup_player(
         run: nodes[2],
     });
 
+    let texture_handle: Handle<Image> = asset_server.load("textures/mannequin_texture.png");
+
     let player = commands
         .spawn((
             Player {
-                speed: 4.0,
+                speed: 10.0,
                 anim_state: AnimState::Idle,
             },
-            WorldAssetRoot(
-                asset_server
-                    .load(GltfAssetLabel::Scene(0).from_asset("characters/Mannequin_Large.glb")),
-            ),
+            WorldAssetRoot(asset_server.load(
+                GltfAssetLabel::Scene(0).from_asset("animations/Rig_Large_MovementBasic.glb"),
+            )),
+            CustomPlayerTexture {
+                texture: texture_handle,
+            },
         ))
+        .observe(init_character_animations)
+        .observe(apply_player_texture)
         .id();
 
     commands.spawn((
@@ -79,8 +90,6 @@ fn setup_player(
             ..default()
         },
     ));
-
-    commands.entity(player).observe(init_character_animations);
 }
 
 fn init_character_animations(
@@ -99,6 +108,27 @@ fn init_character_animations(
             commands
                 .entity(entity)
                 .insert((transitions, AnimationGraphHandle(anims.graph.clone())));
+        }
+    }
+}
+
+fn apply_player_texture(
+    trigger: On<WorldInstanceReady>,
+    q_custom_texture: Query<&CustomPlayerTexture>,
+    q_mesh_material: Query<&MeshMaterial3d<StandardMaterial>>,
+    children: Query<&Children>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let Ok(custom_tex) = q_custom_texture.get(trigger.event_target()) else {
+        return;
+    };
+
+    for descendant in children.iter_descendants(trigger.event_target()) {
+        if let Ok(material_handle) = q_mesh_material.get(descendant) {
+            if let Some(mut material) = materials.get_mut(material_handle) {
+                material.base_color = Color::WHITE;
+                material.base_color_texture = Some(custom_tex.texture.clone());
+            }
         }
     }
 }
@@ -152,7 +182,7 @@ fn move_player(
     player_tf.translation += move_dir * current_speed * time.delta_secs();
 
     if move_dir.length_squared() > 0.001 {
-        let target_rot = Quat::from_rotation_arc(Vec3::NEG_Z, move_dir);
+        let target_rot = Quat::from_rotation_arc(Vec3::Z, move_dir);
         player_tf.rotation = player_tf
             .rotation
             .slerp(target_rot, 12.0 * time.delta_secs());
@@ -180,6 +210,14 @@ fn update_animations(
                         .repeat();
                 }
             }
+        }
+    }
+}
+
+fn debug_gltf_animations(gltf_assets: Res<Assets<Gltf>>) {
+    for (_, gltf) in gltf_assets.iter() {
+        for (name, _) in &gltf.named_animations {
+            info!("Animation disponible : {}", name);
         }
     }
 }
