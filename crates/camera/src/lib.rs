@@ -116,12 +116,15 @@ fn update_smart_camera(
 fn camera_mouse_control(
     mut motion_evr: MessageReader<MouseMotion>,
     mut query: Query<&mut SmartCamera>,
+    mut cursor: Single<&mut CursorOptions>,
     mouse_inputs: Res<ButtonInput<MouseButton>>,
     key_inputs: Res<ButtonInput<KeyCode>>,
 ) {
     let Ok(mut smart_camera) = query.single_mut() else {
         return;
     };
+
+    cursor.visible = !smart_camera.mouse_lock;
 
     if smart_camera.motion_on_input {
         let is_pressed = match smart_camera.custom_input {
@@ -141,7 +144,9 @@ fn camera_mouse_control(
         mouse_delta += msg.delta;
     }
 
-    if mouse_delta != Vec2::ZERO {
+    if mouse_delta != Vec2::ZERO
+        && (smart_camera.mouse_lock || mouse_inputs.pressed(MouseButton::Right))
+    {
         let sensitivity = smart_camera.sensitivity * 0.01;
         smart_camera.yaw -= mouse_delta.x * sensitivity;
         smart_camera.pitch -= mouse_delta.y * sensitivity;
@@ -160,6 +165,11 @@ fn lock_mouse(
     let Ok(mut camera) = camera_query.single_mut() else {
         return;
     };
+
+    if !camera.mouse_lock_enabled {
+        return;
+    }
+
     let is_pressed = match camera.custom_mouse_lock_input {
         Some(CameraInput::Keyboard(keycode)) => key_inputs.just_pressed(keycode),
         Some(CameraInput::Mouse(mouse_button)) => mouse_inputs.just_pressed(mouse_button),

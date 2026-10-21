@@ -100,6 +100,8 @@ fn setup_player(
             camera_subject: Some(player),
             distance: 10.0,
             mode: camera::CameraMode::ThirdPerson,
+            mouse_lock_enabled: false,
+            mouse_lock: true,
             ..default()
         },
     ));
