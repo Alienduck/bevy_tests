@@ -14,6 +14,7 @@ fn main() {
             GizmoConfig::default(),
         )
         .add_systems(Startup, setup_scene)
+        .add_systems(Update, toggle_debug_render_collision)
         .run();
 }
 
@@ -37,4 +38,14 @@ fn setup_scene(
         },
         Transform::from_xyz(8.0, 16.0, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
+}
+
+fn toggle_debug_render_collision(
+    mut gizmo_store_config: ResMut<GizmoConfigStore>,
+    input: ResMut<ButtonInput<KeyCode>>,
+) {
+    if input.just_pressed(KeyCode::KeyT) {
+        let (config, _) = gizmo_store_config.config_mut::<avian3d::prelude::PhysicsGizmos>();
+        config.enabled = !config.enabled;
+    }
 }
