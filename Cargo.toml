@@ -11,6 +11,7 @@ edition = "2024"
 
 [workspace.dependencies]
 bevy = { version = "0.20.0", features = []}
+avian3d = "0.8.0"
 
 player = { path = "crates/player" }
 camera = { path = "crates/camera"}
@@ -33,3 +34,4 @@ opt-level = 3
 [dependencies]
 bevy = { workspace = true }
 player = { workspace = true }
+avian3d = { workspace = true }

@@ -1,9 +1,18 @@
+use avian3d::prelude::*;
 use bevy::prelude::*;
 use player::PlayerPlugin;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, PlayerPlugin))
+        .add_plugins((DefaultPlugins, PlayerPlugin, PhysicsPlugins::default()))
+        .add_plugins(PhysicsDebugPlugin)
+        .insert_gizmo_config(
+            PhysicsGizmos {
+                aabb_color: Some(bevy::color::palettes::css::GREEN.into()),
+                ..default()
+            },
+            GizmoConfig::default(),
+        )
         .add_systems(Startup, setup_scene)
         .run();
 }
@@ -16,6 +25,8 @@ fn setup_scene(
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::default().mesh().size(100.0, 100.0))),
         MeshMaterial3d(materials.add(Color::srgb(0.2, 0.2, 0.2))),
+        Collider::cuboid(100.0, 0.1, 100.0),
+        RigidBody::Static,
     ));
 
     commands.spawn((

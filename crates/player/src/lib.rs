@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use avian3d::prelude::*;
 use bevy::{prelude::*, world_serialization::WorldInstanceReady};
 
 #[derive(Component)]
@@ -35,7 +36,10 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(camera::SmartCameraPlugin)
             .add_systems(Startup, (setup_player, debug_gltf_animations).chain())
-            .add_systems(Update, (move_player, update_animations).chain());
+            .add_systems(
+                Update,
+                (apply_player_texture_system, move_player, update_animations).chain(),
+            );
     }
 }
 
@@ -63,6 +67,9 @@ fn setup_player(
     });
 
     let texture_handle: Handle<Image> = asset_server.load("textures/mannequin_texture.png");
+    const CAPSULE_RADIUS: f32 = 1.0;
+    const CAPSULE_LENGTH: f32 = 2.0;
+    const CAPSULE_HALF_HEIGHT: f32 = CAPSULE_LENGTH * 0.5 + CAPSULE_RADIUS;
 
     let player = commands
         .spawn((
@@ -76,9 +83,15 @@ fn setup_player(
             CustomPlayerTexture {
                 texture: texture_handle,
             },
+            RigidBody::Dynamic,
+            Collider::compound(vec![(
+                Vec3::new(0.0, CAPSULE_HALF_HEIGHT, 0.0),
+                Quat::IDENTITY,
+                Collider::capsule(CAPSULE_RADIUS, CAPSULE_LENGTH),
+            )]),
+            LockedAxes::ROTATION_LOCKED,
         ))
         .observe(init_character_animations)
-        .observe(apply_player_texture)
         .id();
 
     commands.spawn((
@@ -112,24 +125,40 @@ fn init_character_animations(
     }
 }
 
-fn apply_player_texture(
-    trigger: On<WorldInstanceReady>,
-    q_custom_texture: Query<&CustomPlayerTexture>,
-    q_mesh_material: Query<&MeshMaterial3d<StandardMaterial>>,
-    children: Query<&Children>,
+fn apply_player_texture_system(
+    mut commands: Commands,
+    q_new: Query<
+        (Entity, &MeshMaterial3d<StandardMaterial>),
+        Added<MeshMaterial3d<StandardMaterial>>,
+    >,
+    q_parent: Query<&ChildOf>,
+    q_custom: Query<&CustomPlayerTexture>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let Ok(custom_tex) = q_custom_texture.get(trigger.event_target()) else {
-        return;
-    };
-
-    for descendant in children.iter_descendants(trigger.event_target()) {
-        if let Ok(material_handle) = q_mesh_material.get(descendant) {
-            if let Some(mut material) = materials.get_mut(material_handle) {
-                material.base_color = Color::WHITE;
-                material.base_color_texture = Some(custom_tex.texture.clone());
+    for (entity, mat_handle) in &q_new {
+        let mut current = entity;
+        let mut texture: Option<Handle<Image>> = None;
+        loop {
+            if let Ok(custom) = q_custom.get(current) {
+                texture = Some(custom.texture.clone());
+                break;
+            }
+            match q_parent.get(current) {
+                Ok(child_of) => current = child_of.parent(),
+                Err(_) => break,
             }
         }
+        let Some(texture) = texture else { continue };
+
+        let Some(src) = materials.get(&mat_handle.0) else {
+            continue;
+        };
+        let mut copy = src.clone();
+        copy.base_color = Color::WHITE;
+        copy.base_color_texture = Some(texture);
+
+        let new_handle = materials.add(copy);
+        commands.entity(entity).insert(MeshMaterial3d(new_handle));
     }
 }
 
