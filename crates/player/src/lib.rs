@@ -7,6 +7,8 @@ use bevy::{prelude::*, world_serialization::WorldInstanceReady};
 #[require(Transform, Visibility)]
 pub struct Player {
     pub speed: f32,
+    pub can_jump: bool,
+    pub jump_recover_dist: f32,
     pub anim_state: AnimState,
 }
 
@@ -15,6 +17,7 @@ pub enum AnimState {
     Idle,
     Walk,
     Run,
+    StartJump,
 }
 
 #[derive(Resource)]
@@ -23,6 +26,7 @@ pub struct PlayerAnimations {
     pub idle: AnimationNodeIndex,
     pub walk: AnimationNodeIndex,
     pub run: AnimationNodeIndex,
+    pub start_jump: AnimationNodeIndex,
 }
 
 #[derive(Component)]
@@ -38,7 +42,14 @@ impl Plugin for PlayerPlugin {
             .add_systems(Startup, (setup_player, debug_gltf_animations).chain())
             .add_systems(
                 Update,
-                (apply_player_texture_system, move_player, update_animations).chain(),
+                (
+                    apply_player_texture_system,
+                    move_player,
+                    jump_handler,
+                    jump,
+                    update_animations,
+                )
+                    .chain(),
             );
     }
 }
@@ -49,13 +60,20 @@ fn setup_player(
     mut graphs: ResMut<Assets<AnimationGraph>>,
 ) {
     let (graph, nodes) = AnimationGraph::from_clips([
-        asset_server
-            .load(GltfAssetLabel::Animation(3).from_asset("animations/Rig_Large_General.glb")),
         asset_server.load(
-            GltfAssetLabel::Animation(2).from_asset("animations/Rig_Large_MovementBasic.glb"),
+            GltfAssetLabel::Animation(6).from_asset("animations/Rig_Medium/Rig_Medium_General.glb"),
         ),
         asset_server.load(
-            GltfAssetLabel::Animation(0).from_asset("animations/Rig_Large_MovementBasic.glb"),
+            GltfAssetLabel::Animation(9)
+                .from_asset("animations/Rig_Medium/Rig_Medium_MovementBasic.glb"),
+        ),
+        asset_server.load(
+            GltfAssetLabel::Animation(6)
+                .from_asset("animations/Rig_Medium/Rig_Medium_MovementBasic.glb"),
+        ),
+        asset_server.load(
+            GltfAssetLabel::Animation(5)
+                .from_asset("animations/Rig_Medium/Rig_Medium_MovementBasic.glb"),
         ),
     ]);
 
@@ -64,21 +82,24 @@ fn setup_player(
         idle: nodes[0],
         walk: nodes[1],
         run: nodes[2],
+        start_jump: nodes[3],
     });
 
     let texture_handle: Handle<Image> = asset_server.load("textures/mannequin_texture.png");
-    const CAPSULE_RADIUS: f32 = 1.0;
-    const CAPSULE_LENGTH: f32 = 2.0;
+    const CAPSULE_RADIUS: f32 = 0.4;
+    const CAPSULE_LENGTH: f32 = 0.8;
     const CAPSULE_HALF_HEIGHT: f32 = CAPSULE_LENGTH * 0.5 + CAPSULE_RADIUS;
 
     let player = commands
         .spawn((
             Player {
                 speed: 10.0,
+                can_jump: true,
+                jump_recover_dist: 0.02,
                 anim_state: AnimState::Idle,
             },
             WorldAssetRoot(asset_server.load(
-                GltfAssetLabel::Scene(0).from_asset("animations/Rig_Large_MovementBasic.glb"),
+                GltfAssetLabel::Scene(0).from_asset("animations/Rig_Medium/Rig_Medium_General.glb"),
             )),
             CustomPlayerTexture {
                 texture: texture_handle,
@@ -89,6 +110,12 @@ fn setup_player(
                 Quat::IDENTITY,
                 Collider::capsule(CAPSULE_RADIUS, CAPSULE_LENGTH),
             )]),
+            ShapeCaster::new(
+                Collider::capsule(CAPSULE_RADIUS, CAPSULE_LENGTH),
+                Vec3::new(0.0, CAPSULE_HALF_HEIGHT, 0.0),
+                Quat::IDENTITY,
+                Dir3::NEG_Y,
+            ),
             LockedAxes::ROTATION_LOCKED,
         ))
         .observe(init_character_animations)
@@ -105,6 +132,35 @@ fn setup_player(
             ..default()
         },
     ));
+}
+
+fn jump(
+    mut player_linear_q: Query<(&mut LinearVelocity, &mut Player)>,
+    input: ResMut<ButtonInput<KeyCode>>,
+) {
+    let Ok((mut linear, mut player)) = player_linear_q.single_mut() else {
+        return;
+    };
+    if input.just_pressed(KeyCode::Space) && player.can_jump {
+        player.can_jump = false;
+        linear.y += 5.0;
+        player.anim_state = AnimState::StartJump;
+    }
+}
+
+fn jump_handler(mut player_q: Query<(&mut Player, &ShapeCaster, &ShapeHits)>) {
+    let Ok((mut player, _, hits)) = player_q.single_mut() else {
+        return;
+    };
+    if player.can_jump {
+        return;
+    }
+    for hit in hits.iter() {
+        if hit.distance < player.jump_recover_dist {
+            player.can_jump = true;
+            player.anim_state = AnimState::Idle;
+        }
+    }
 }
 
 fn init_character_animations(
@@ -231,6 +287,7 @@ fn update_animations(
             AnimState::Idle => anims.idle,
             AnimState::Walk => anims.walk,
             AnimState::Run => anims.run,
+            AnimState::StartJump => anims.start_jump,
         };
 
         for child in children.iter_descendants(root_entity) {
