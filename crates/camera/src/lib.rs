@@ -1,7 +1,7 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
-    input::mouse::MouseMotion,
+    input::mouse::{MouseMotion, MouseWheel},
     prelude::*,
     window::{CursorGrabMode, CursorOptions},
 };
@@ -31,6 +31,14 @@ pub struct SmartCamera {
     pub mode: CameraMode,
     /// Distance between camera and followed entity (when CameraMode is on ThirdPerson)
     pub distance: f32,
+    /// Min Camera distance
+    pub min_distance: f32,
+    /// Max Camera distance
+    pub max_distance: f32,
+    /// If this property is true, the player can scroll to zoom in or out with the camera to control the distance
+    pub can_zoom: bool,
+    /// The sensitivity of the scrolling mouse behavior
+    pub scroll_sensitivity: f32,
     /// The mouse motion sensitivity
     pub sensitivity: f32,
     /// Vertical angle (up/down)
@@ -59,7 +67,11 @@ impl Default for SmartCamera {
             camera_subject: None,
             mode: CameraMode::ThirdPerson,
             distance: 5.0,
+            min_distance: 1.0,
+            max_distance: 10.0,
+            can_zoom: false,
             sensitivity: 1.0,
+            scroll_sensitivity: 0.25,
             pitch: 0.0,
             yaw: 0.0,
             fov: 70.0,
@@ -77,7 +89,10 @@ pub struct SmartCameraPlugin;
 impl Plugin for SmartCameraPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(PostUpdate, update_smart_camera)
-            .add_systems(Update, (camera_mouse_control, lock_mouse).chain());
+            .add_systems(
+                Update,
+                (camera_mouse_control, zoom_handler, lock_mouse).chain(),
+            );
     }
 }
 
@@ -185,6 +200,17 @@ fn lock_mouse(
             cursor.grab_mode = CursorGrabMode::Locked;
         }
         camera.mouse_lock = !camera.mouse_lock;
+    }
+}
+
+fn zoom_handler(mut camera_q: Query<&mut SmartCamera>, mut mouse_wheel: MessageReader<MouseWheel>) {
+    let Ok(mut camera) = camera_q.single_mut() else {
+        return;
+    };
+
+    for wheel in mouse_wheel.read() {
+        camera.distance = (camera.distance + (wheel.y * -1.0) * camera.scroll_sensitivity)
+            .clamp(camera.min_distance, camera.max_distance);
     }
 }
 

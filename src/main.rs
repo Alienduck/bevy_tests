@@ -43,7 +43,7 @@ fn setup_scene(
 
     commands.spawn(GrassField::new(
         Vec2::splat(100.0),
-        GrassStyle::ELEPHANT_GRASS,
+        GrassStyle::STYLIZED,
         &mut styles,
     ));
 

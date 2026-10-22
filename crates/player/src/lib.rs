@@ -87,14 +87,14 @@ fn setup_player(
     });
 
     let texture_handle: Handle<Image> = asset_server.load("textures/mannequin_texture.png");
-    const CAPSULE_RADIUS: f32 = 0.6;
+    const CAPSULE_RADIUS: f32 = 0.4;
     const CAPSULE_LENGTH: f32 = 1.2;
     const CAPSULE_HALF_HEIGHT: f32 = CAPSULE_LENGTH * 0.5 + CAPSULE_RADIUS;
 
     let player = commands
         .spawn((
             Player {
-                speed: 10.0,
+                speed: 5.0,
                 can_jump: true,
                 jump_recover_dist: 0.02,
                 anim_state: AnimState::Idle,
@@ -105,7 +105,7 @@ fn setup_player(
             CustomPlayerTexture {
                 texture: texture_handle,
             },
-            RigidBody::Kinematic,
+            RigidBody::Dynamic,
             Collider::compound(vec![(
                 Vec3::new(0.0, CAPSULE_HALF_HEIGHT, 0.0),
                 Quat::IDENTITY,
@@ -131,6 +131,8 @@ fn setup_player(
             mode: camera::CameraMode::ThirdPerson,
             mouse_lock_enabled: false,
             mouse_lock: true,
+            can_zoom: true,
+            max_distance: 30.0,
             ..default()
         },
     ));
