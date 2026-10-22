@@ -1121,6 +1121,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_grass"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b3b718e8ccb866375c53e0ea34f2430361451fa531fefd02a1152f9a0d7d7fd"
+dependencies = [
+ "avian3d",
+ "bevy",
+ "bytemuck",
+ "ron",
+ "serde",
+]
+
+[[package]]
 name = "bevy_heavy"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1827,6 +1840,7 @@ version = "0.0.1"
 dependencies = [
  "avian3d",
  "bevy",
+ "bevy_grass",
  "player",
 ]
 
@@ -4857,6 +4871,7 @@ version = "0.0.1"
 dependencies = [
  "avian3d",
  "bevy",
+ "bevy_grass",
  "camera",
 ]
 
