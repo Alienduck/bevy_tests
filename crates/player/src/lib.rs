@@ -86,8 +86,8 @@ fn setup_player(
     });
 
     let texture_handle: Handle<Image> = asset_server.load("textures/mannequin_texture.png");
-    const CAPSULE_RADIUS: f32 = 0.4;
-    const CAPSULE_LENGTH: f32 = 0.8;
+    const CAPSULE_RADIUS: f32 = 0.5;
+    const CAPSULE_LENGTH: f32 = 1.0;
     const CAPSULE_HALF_HEIGHT: f32 = CAPSULE_LENGTH * 0.5 + CAPSULE_RADIUS;
 
     let player = commands
