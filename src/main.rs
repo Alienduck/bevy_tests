@@ -1,10 +1,16 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
+use bevy_grass::prelude::*;
 use player::PlayerPlugin;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, PlayerPlugin, PhysicsPlugins::default()))
+        .add_plugins((
+            DefaultPlugins,
+            PlayerPlugin,
+            PhysicsPlugins::default(),
+            GrassPlugins::default(),
+        ))
         .add_plugins(PhysicsDebugPlugin)
         .insert_gizmo_config(
             PhysicsGizmos {
@@ -22,12 +28,23 @@ fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut styles: ResMut<Assets<GrassStyle>>,
 ) {
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::default().mesh().size(100.0, 100.0))),
-        MeshMaterial3d(materials.add(Color::srgb(0.2, 0.2, 0.2))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.18, 0.14, 0.09),
+            perceptual_roughness: 0.9,
+            ..default()
+        })),
         Collider::cuboid(100.0, 0.1, 100.0),
         RigidBody::Static,
+    ));
+
+    commands.spawn(GrassField::new(
+        Vec2::splat(100.0),
+        GrassStyle::ELEPHANT_GRASS,
+        &mut styles,
     ));
 
     commands.spawn((

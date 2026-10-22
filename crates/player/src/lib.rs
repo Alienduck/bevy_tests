@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use avian3d::prelude::*;
 use bevy::{prelude::*, world_serialization::WorldInstanceReady};
+use bevy_grass::prelude::*;
 
 #[derive(Component)]
 #[require(Transform, Visibility)]
@@ -86,8 +87,8 @@ fn setup_player(
     });
 
     let texture_handle: Handle<Image> = asset_server.load("textures/mannequin_texture.png");
-    const CAPSULE_RADIUS: f32 = 0.5;
-    const CAPSULE_LENGTH: f32 = 1.0;
+    const CAPSULE_RADIUS: f32 = 0.6;
+    const CAPSULE_LENGTH: f32 = 1.2;
     const CAPSULE_HALF_HEIGHT: f32 = CAPSULE_LENGTH * 0.5 + CAPSULE_RADIUS;
 
     let player = commands
@@ -104,7 +105,7 @@ fn setup_player(
             CustomPlayerTexture {
                 texture: texture_handle,
             },
-            RigidBody::Dynamic,
+            RigidBody::Kinematic,
             Collider::compound(vec![(
                 Vec3::new(0.0, CAPSULE_HALF_HEIGHT, 0.0),
                 Quat::IDENTITY,
@@ -117,6 +118,7 @@ fn setup_player(
                 Dir3::NEG_Y,
             ),
             LockedAxes::ROTATION_LOCKED,
+            GrassInteractorFromCollider::default(),
         ))
         .observe(init_character_animations)
         .id();
