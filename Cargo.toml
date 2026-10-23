@@ -13,6 +13,7 @@ edition = "2024"
 bevy = { version = "0.20.0", features = []}
 avian3d = "0.8.0"
 bevy_grass = "0.20.3"
+bevy_sky_gradient = { path = "../bevy_sky_gradient" }
 
 player = { path = "crates/player" }
 camera = { path = "crates/camera"}
@@ -37,3 +38,4 @@ bevy = { workspace = true }
 player = { workspace = true }
 avian3d = { workspace = true }
 bevy_grass = { workspace = true }
+bevy_sky_gradient = { workspace = true }
