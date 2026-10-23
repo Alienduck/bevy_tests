@@ -1,6 +1,7 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
 use bevy_grass::prelude::*;
+use bevy_sky_gradient::prelude::*;
 use player::PlayerPlugin;
 
 fn main() {
@@ -10,6 +11,21 @@ fn main() {
             PlayerPlugin,
             PhysicsPlugins::default(),
             GrassPlugins::default(),
+            SkyPlugin::builder_all_features()
+                .with_noise_settings(NoiseSettings {
+                    noise_texture_size: 128,
+                    voronoi_texture_size: 128,
+                    noise_size_limit: Some(256),
+                    ..default()
+                })
+                .set_cycle(SkyCyclePlugin {
+                    sky_time_settings: SkyTimeSettings::default(),
+                    sky_time: SkyTime {
+                        time: 14.0,
+                        auto_tick: true,
+                    },
+                })
+                .build(),
         ))
         .add_plugins(PhysicsDebugPlugin)
         .insert_gizmo_config(
@@ -47,14 +63,14 @@ fn setup_scene(
         &mut styles,
     ));
 
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 10_000.0,
-            shadow_maps_enabled: true,
-            ..default()
-        },
-        Transform::from_xyz(8.0, 16.0, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
+    // commands.spawn((
+    //     DirectionalLight {
+    //         illuminance: 10_000.0,
+    //         shadow_maps_enabled: true,
+    //         ..default()
+    //     },
+    //     Transform::from_xyz(8.0, 16.0, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
+    // ));
 }
 
 fn toggle_debug_render_collision(
