@@ -3,6 +3,7 @@ use std::time::Duration;
 use avian3d::prelude::*;
 use bevy::{prelude::*, world_serialization::WorldInstanceReady};
 use bevy_grass::prelude::*;
+use bevy_sky_gradient::prelude::*;
 
 #[derive(Component)]
 #[require(Transform, Visibility)]
@@ -41,6 +42,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(camera::SmartCameraPlugin)
             .add_systems(Startup, (setup_player, debug_gltf_animations).chain())
+            .add_systems(PostUpdate, toggle_first_person)
             .add_systems(
                 Update,
                 (
@@ -129,12 +131,14 @@ fn setup_player(
             camera_subject: Some(player),
             distance: 10.0,
             mode: camera::CameraMode::ThirdPerson,
-            mouse_lock_enabled: false,
+            mouse_lock_enabled: true,
             mouse_lock: true,
+            custom_mouse_lock_input: Some(camera::CameraInput::Keyboard(KeyCode::Escape)),
             can_zoom: true,
             max_distance: 30.0,
             ..default()
         },
+        SkyboxMagnetTag,
     ));
 }
 
@@ -277,6 +281,20 @@ fn move_player(
         player_tf.rotation = player_tf
             .rotation
             .slerp(target_rot, 12.0 * time.delta_secs());
+    }
+}
+
+fn toggle_first_person(
+    mut camera_q: Query<&mut camera::SmartCamera>,
+    inputs: ResMut<ButtonInput<KeyCode>>,
+) {
+    if inputs.just_pressed(KeyCode::KeyQ) {
+        if let Ok(mut camera) = camera_q.single_mut() {
+            camera.mode = match camera.mode {
+                camera::CameraMode::FirstPerson => camera::CameraMode::ThirdPerson,
+                camera::CameraMode::ThirdPerson => camera::CameraMode::FirstPerson,
+            };
+        };
     }
 }
 
