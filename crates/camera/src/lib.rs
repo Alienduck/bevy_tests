@@ -88,11 +88,16 @@ pub struct SmartCameraPlugin;
 
 impl Plugin for SmartCameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PostUpdate, update_smart_camera)
-            .add_systems(
-                Update,
-                (camera_mouse_control, zoom_handler, lock_mouse).chain(),
-            );
+        app.add_systems(
+            Update,
+            (
+                camera_mouse_control,
+                zoom_handler,
+                lock_mouse,
+                update_smart_camera,
+            )
+                .chain(),
+        );
     }
 }
 
