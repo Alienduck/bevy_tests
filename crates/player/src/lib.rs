@@ -9,6 +9,7 @@ use bevy_sky_gradient::prelude::*;
 #[require(Transform, Visibility)]
 pub struct Player {
     pub speed: f32,
+    pub jump_force: f32,
     pub can_jump: bool,
     pub jump_recover_dist: f32,
     pub anim_state: AnimState,
@@ -97,6 +98,7 @@ fn setup_player(
         .spawn((
             Player {
                 speed: 5.0,
+                jump_force: 4.,
                 can_jump: true,
                 jump_recover_dist: 0.02,
                 anim_state: AnimState::Idle,
@@ -151,7 +153,7 @@ fn jump(
     };
     if input.just_pressed(KeyCode::Space) && player.can_jump {
         player.can_jump = false;
-        linear.y += 5.0;
+        linear.y += player.jump_force;
         player.anim_state = AnimState::StartJump;
     }
 }
