@@ -202,7 +202,7 @@ fn lock_mouse(
             cursor.visible = true;
         } else {
             cursor.visible = false;
-            cursor.grab_mode = CursorGrabMode::Locked;
+            cursor.grab_mode = CursorGrabMode::Confined;
         }
         camera.mouse_lock = !camera.mouse_lock;
     }
