@@ -21,6 +21,8 @@ pub enum AnimState {
     Walk,
     Run,
     StartJump,
+    IdleJump,
+    Landing,
 }
 
 #[derive(Resource)]
@@ -30,6 +32,8 @@ pub struct PlayerAnimations {
     pub walk: AnimationNodeIndex,
     pub run: AnimationNodeIndex,
     pub start_jump: AnimationNodeIndex,
+    pub idle_jump: AnimationNodeIndex,
+    pub landing: AnimationNodeIndex,
 }
 
 #[derive(Component)]
@@ -79,6 +83,14 @@ fn setup_player(
             GltfAssetLabel::Animation(5)
                 .from_asset("animations/Rig_Medium/Rig_Medium_MovementBasic.glb"),
         ),
+        asset_server.load(
+            GltfAssetLabel::Animation(3)
+                .from_asset("animations/Rig_Medium/Rig_Medium_MovementBasic.glb"),
+        ),
+        asset_server.load(
+            GltfAssetLabel::Animation(4)
+                .from_asset("animations/Rig_Medium/Rig_Medium_MovementBasic.glb"),
+        ),
     ]);
 
     commands.insert_resource(PlayerAnimations {
@@ -87,6 +99,8 @@ fn setup_player(
         walk: nodes[1],
         run: nodes[2],
         start_jump: nodes[3],
+        idle_jump: nodes[4],
+        landing: nodes[5],
     });
 
     let texture_handle: Handle<Image> = asset_server.load("textures/mannequin_texture.png");
@@ -168,7 +182,7 @@ fn jump_handler(mut player_q: Query<(&mut Player, &ShapeCaster, &ShapeHits)>) {
     for hit in hits.iter() {
         if hit.distance < player.jump_recover_dist {
             player.can_jump = true;
-            player.anim_state = AnimState::Idle;
+            player.anim_state = AnimState::Landing;
         }
     }
 }
@@ -287,31 +301,43 @@ fn move_player(
 }
 
 fn toggle_first_person(
+    mut player_q: Query<&mut Visibility, With<Player>>,
     mut camera_q: Query<&mut camera::SmartCamera>,
     inputs: ResMut<ButtonInput<KeyCode>>,
 ) {
+    let Ok(mut player_visibility) = player_q.single_mut() else {
+        return;
+    };
     if inputs.just_pressed(KeyCode::KeyQ) {
         if let Ok(mut camera) = camera_q.single_mut() {
             camera.mode = match camera.mode {
-                camera::CameraMode::FirstPerson => camera::CameraMode::ThirdPerson,
-                camera::CameraMode::ThirdPerson => camera::CameraMode::FirstPerson,
+                camera::CameraMode::FirstPerson => {
+                    *player_visibility = Visibility::Visible;
+                    camera::CameraMode::ThirdPerson
+                }
+                camera::CameraMode::ThirdPerson => {
+                    *player_visibility = Visibility::Hidden;
+                    camera::CameraMode::FirstPerson
+                }
             };
         };
     }
 }
 
 fn update_animations(
-    anims: Res<PlayerAnimations>,
-    player_q: Query<(&Player, Entity), Changed<Player>>,
-    children: Query<&Children>,
+    mut player_q: Query<(&mut Player, Entity), Changed<Player>>,
     mut anim_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
+    anims: Res<PlayerAnimations>,
+    children: Query<&Children>,
 ) {
-    for (player, root_entity) in &player_q {
+    for (mut player, root_entity) in &mut player_q {
         let target_node = match player.anim_state {
             AnimState::Idle => anims.idle,
             AnimState::Walk => anims.walk,
             AnimState::Run => anims.run,
             AnimState::StartJump => anims.start_jump,
+            AnimState::IdleJump => anims.idle_jump,
+            AnimState::Landing => anims.landing,
         };
 
         for child in children.iter_descendants(root_entity) {
@@ -320,6 +346,16 @@ fn update_animations(
                     transitions
                         .play(&mut anim_player, target_node, Duration::from_millis(200))
                         .repeat();
+                }
+                if let Some(anim) = anim_player.animation(anims.start_jump) {
+                    if anim.just_completed() {
+                        player.anim_state = AnimState::IdleJump;
+                    }
+                }
+                if let Some(anim) = anim_player.animation(anims.landing) {
+                    if anim.just_completed() {
+                        player.anim_state = AnimState::Idle;
+                    }
                 }
             }
         }
