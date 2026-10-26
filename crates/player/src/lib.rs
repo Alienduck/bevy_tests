@@ -284,11 +284,13 @@ fn move_player(
     } else {
         player.speed
     };
-    player.anim_state = if sprinting {
-        AnimState::Run
-    } else {
-        AnimState::Walk
-    };
+    if player.can_jump {
+        player.anim_state = if sprinting {
+            AnimState::Run
+        } else {
+            AnimState::Walk
+        };
+    }
 
     player_tf.translation += move_dir * current_speed * time.delta_secs();
 
