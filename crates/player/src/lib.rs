@@ -1,9 +1,11 @@
-use std::time::Duration;
-
 use avian3d::prelude::*;
-use bevy::{prelude::*, world_serialization::WorldInstanceReady};
+use bevy::prelude::*;
 use bevy_grass::prelude::*;
 use bevy_sky_gradient::prelude::*;
+
+use crate::state::AnimState;
+
+mod state;
 
 #[derive(Component)]
 #[require(Transform, Visibility)]
@@ -15,27 +17,6 @@ pub struct Player {
     pub anim_state: AnimState,
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum AnimState {
-    Idle,
-    Walk,
-    Run,
-    StartJump,
-    IdleJump,
-    Landing,
-}
-
-#[derive(Resource)]
-pub struct PlayerAnimations {
-    pub graph: Handle<AnimationGraph>,
-    pub idle: AnimationNodeIndex,
-    pub walk: AnimationNodeIndex,
-    pub run: AnimationNodeIndex,
-    pub start_jump: AnimationNodeIndex,
-    pub idle_jump: AnimationNodeIndex,
-    pub landing: AnimationNodeIndex,
-}
-
 #[derive(Component)]
 pub struct CustomPlayerTexture {
     pub texture: Handle<Image>,
@@ -45,64 +26,17 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(camera::SmartCameraPlugin)
+        app.add_plugins((camera::SmartCameraPlugin, state::PlayerStatePlugin))
             .add_systems(Startup, (setup_player, debug_gltf_animations).chain())
             .add_systems(PostUpdate, toggle_first_person)
             .add_systems(
                 Update,
-                (
-                    apply_player_texture_system,
-                    move_player,
-                    jump_handler,
-                    jump,
-                    update_animations,
-                )
-                    .chain(),
+                (apply_player_texture_system, move_player, jump_handler, jump).chain(),
             );
     }
 }
 
-fn setup_player(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut graphs: ResMut<Assets<AnimationGraph>>,
-) {
-    let (graph, nodes) = AnimationGraph::from_clips([
-        asset_server.load(
-            GltfAssetLabel::Animation(6).from_asset("animations/Rig_Medium/Rig_Medium_General.glb"),
-        ),
-        asset_server.load(
-            GltfAssetLabel::Animation(9)
-                .from_asset("animations/Rig_Medium/Rig_Medium_MovementBasic.glb"),
-        ),
-        asset_server.load(
-            GltfAssetLabel::Animation(6)
-                .from_asset("animations/Rig_Medium/Rig_Medium_MovementBasic.glb"),
-        ),
-        asset_server.load(
-            GltfAssetLabel::Animation(5)
-                .from_asset("animations/Rig_Medium/Rig_Medium_MovementBasic.glb"),
-        ),
-        asset_server.load(
-            GltfAssetLabel::Animation(3)
-                .from_asset("animations/Rig_Medium/Rig_Medium_MovementBasic.glb"),
-        ),
-        asset_server.load(
-            GltfAssetLabel::Animation(4)
-                .from_asset("animations/Rig_Medium/Rig_Medium_MovementBasic.glb"),
-        ),
-    ]);
-
-    commands.insert_resource(PlayerAnimations {
-        graph: graphs.add(graph),
-        idle: nodes[0],
-        walk: nodes[1],
-        run: nodes[2],
-        start_jump: nodes[3],
-        idle_jump: nodes[4],
-        landing: nodes[5],
-    });
-
+fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
     let texture_handle: Handle<Image> = asset_server.load("textures/mannequin_texture.png");
     const CAPSULE_RADIUS: f32 = 0.4;
     const CAPSULE_LENGTH: f32 = 1.2;
@@ -138,7 +72,7 @@ fn setup_player(
             LockedAxes::ROTATION_LOCKED,
             GrassInteractorFromCollider::default(),
         ))
-        .observe(init_character_animations)
+        .observe(state::init_character_animations)
         .id();
 
     commands.spawn((
@@ -183,26 +117,6 @@ fn jump_handler(mut player_q: Query<(&mut Player, &ShapeCaster, &ShapeHits)>) {
         if hit.distance < player.jump_recover_dist {
             player.can_jump = true;
             player.anim_state = AnimState::Landing;
-        }
-    }
-}
-
-fn init_character_animations(
-    trigger: On<WorldInstanceReady>,
-    anims: Res<PlayerAnimations>,
-    children: Query<&Children>,
-    mut players: Query<(Entity, &mut AnimationPlayer)>,
-    mut commands: Commands,
-) {
-    for child in children.iter_descendants(trigger.event_target()) {
-        if let Ok((entity, mut player)) = players.get_mut(child) {
-            let mut transitions = AnimationTransitions::new();
-            transitions
-                .play(&mut player, anims.idle, Duration::ZERO)
-                .repeat();
-            commands
-                .entity(entity)
-                .insert((transitions, AnimationGraphHandle(anims.graph.clone())));
         }
     }
 }
@@ -284,11 +198,13 @@ fn move_player(
     } else {
         player.speed
     };
-    player.anim_state = if sprinting {
-        AnimState::Run
-    } else {
-        AnimState::Walk
-    };
+    if player.can_jump {
+        player.anim_state = if sprinting {
+            AnimState::Run
+        } else {
+            AnimState::Walk
+        };
+    }
 
     player_tf.translation += move_dir * current_speed * time.delta_secs();
 
@@ -321,44 +237,6 @@ fn toggle_first_person(
                 }
             };
         };
-    }
-}
-
-fn update_animations(
-    mut player_q: Query<(&mut Player, Entity), Changed<Player>>,
-    mut anim_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
-    anims: Res<PlayerAnimations>,
-    children: Query<&Children>,
-) {
-    for (mut player, root_entity) in &mut player_q {
-        let target_node = match player.anim_state {
-            AnimState::Idle => anims.idle,
-            AnimState::Walk => anims.walk,
-            AnimState::Run => anims.run,
-            AnimState::StartJump => anims.start_jump,
-            AnimState::IdleJump => anims.idle_jump,
-            AnimState::Landing => anims.landing,
-        };
-
-        for child in children.iter_descendants(root_entity) {
-            if let Ok((mut anim_player, mut transitions)) = anim_players.get_mut(child) {
-                if !anim_player.is_playing_animation(target_node) {
-                    transitions
-                        .play(&mut anim_player, target_node, Duration::from_millis(200))
-                        .repeat();
-                }
-                if let Some(anim) = anim_player.animation(anims.start_jump) {
-                    if anim.just_completed() {
-                        player.anim_state = AnimState::IdleJump;
-                    }
-                }
-                if let Some(anim) = anim_player.animation(anims.landing) {
-                    if anim.just_completed() {
-                        player.anim_state = AnimState::Idle;
-                    }
-                }
-            }
-        }
     }
 }
 
