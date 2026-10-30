@@ -1,8 +1,7 @@
+use bevy::{animation::AnimationPlayer, prelude::*, world_serialization::WorldInstanceReady};
 use std::time::Duration;
 
-use bevy::{prelude::*, world_serialization::WorldInstanceReady};
-
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum AnimState {
     Idle,
     Walk,
@@ -28,7 +27,8 @@ pub struct PlayerStatePlugin;
 impl Plugin for PlayerStatePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, update_animations);
+            .add_systems(Update, update_animations)
+            .add_systems(PostUpdate, check_animation_completion);
     }
 }
 
@@ -87,6 +87,7 @@ pub fn init_character_animations(
             transitions
                 .play(&mut player, anims.idle, Duration::ZERO)
                 .repeat();
+
             commands
                 .entity(entity)
                 .insert((transitions, AnimationGraphHandle(anims.graph.clone())));
@@ -95,36 +96,63 @@ pub fn init_character_animations(
 }
 
 fn update_animations(
-    mut player_q: Query<(&mut crate::Player, Entity), Changed<crate::Player>>,
+    player_q: Query<(&crate::Player, Entity), Changed<crate::Player>>,
     mut anim_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     anims: Res<PlayerAnimations>,
     children: Query<&Children>,
 ) {
-    for (mut player, root_entity) in &mut player_q {
-        let target_node = match player.anim_state {
-            AnimState::Idle => anims.idle,
-            AnimState::Walk => anims.walk,
-            AnimState::Run => anims.run,
-            AnimState::StartJump => anims.start_jump,
-            AnimState::IdleJump => anims.idle_jump,
-            AnimState::Landing => anims.landing,
+    for (player, root_entity) in &player_q {
+        let (target_node, looped, speed) = match player.anim_state {
+            AnimState::Idle => (anims.idle, true, 1.0),
+            AnimState::Walk => (anims.walk, true, 1.0),
+            AnimState::Run => (anims.run, true, 1.2),
+            AnimState::StartJump => (anims.start_jump, false, 1.0),
+            AnimState::IdleJump => (anims.idle_jump, true, 1.0),
+            AnimState::Landing => (anims.landing, false, 1.5),
         };
 
         for child in children.iter_descendants(root_entity) {
             if let Ok((mut anim_player, mut transitions)) = anim_players.get_mut(child) {
                 if !anim_player.is_playing_animation(target_node) {
-                    transitions
-                        .play(&mut anim_player, target_node, Duration::from_millis(200))
-                        .repeat();
-                }
-                if let Some(anim) = anim_player.animation(anims.start_jump) {
-                    if anim.just_completed() {
-                        player.anim_state = AnimState::IdleJump;
+                    let active_anim =
+                        transitions.play(&mut anim_player, target_node, Duration::from_millis(200));
+
+                    active_anim.set_speed(speed);
+                    if looped {
+                        active_anim.repeat();
+                    } else {
+                        active_anim.set_repeat(bevy::animation::RepeatAnimation::Never);
                     }
                 }
-                if let Some(anim) = anim_player.animation(anims.landing) {
-                    if anim.just_completed() {
-                        player.anim_state = AnimState::Idle;
+            }
+        }
+    }
+}
+
+fn check_animation_completion(
+    mut player_q: Query<(&mut crate::Player, Entity)>,
+    anim_players: Query<&AnimationPlayer>,
+    anims: Res<PlayerAnimations>,
+    children: Query<&Children>,
+) {
+    for (mut player, root_entity) in &mut player_q {
+        let target_node_to_check = match player.anim_state {
+            AnimState::StartJump => Some(anims.start_jump),
+            AnimState::Landing => Some(anims.landing),
+            _ => None,
+        };
+
+        if let Some(node_to_check) = target_node_to_check {
+            for child in children.iter_descendants(root_entity) {
+                if let Ok(anim_player) = anim_players.get(child) {
+                    if let Some(anim) = anim_player.animation(node_to_check) {
+                        if anim.is_finished() {
+                            player.anim_state = match player.anim_state {
+                                AnimState::StartJump => AnimState::IdleJump,
+                                AnimState::Landing => AnimState::Idle,
+                                _ => player.anim_state,
+                            };
+                        }
                     }
                 }
             }
