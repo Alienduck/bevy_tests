@@ -19,7 +19,12 @@ fn main() {
                     ..default()
                 })
                 .set_cycle(SkyCyclePlugin {
-                    sky_time_settings: SkyTimeSettings::default(),
+                    sky_time_settings: SkyTimeSettings {
+                        day_time_sec: 1.,
+                        night_time_sec: 100.,
+                        sunrise_time_sec: 10.,
+                        sunset_time_sec: 10.,
+                    },
                     sky_time: SkyTime {
                         time: 14.0,
                         auto_tick: true,
@@ -28,6 +33,11 @@ fn main() {
                 .build(),
         ))
         .add_plugins(PhysicsDebugPlugin)
+        .insert_resource(GrassSettings {
+            mid_range_density: 1.,
+            instance_capacity: 300_000,
+            ..GrassSettings::ULTRA
+        })
         .insert_gizmo_config(
             PhysicsGizmos {
                 aabb_color: Some(bevy::color::palettes::css::GREEN.into()),
@@ -57,20 +67,22 @@ fn setup_scene(
         RigidBody::Static,
     ));
 
+    let custom_blade = GrassBlade {
+        height: Vec2::new(0.1, 1.5),
+        ..GrassStyle::CRYSTAL_SPIRES.blade
+    };
+
     commands.spawn(GrassField::new(
         Vec2::splat(100.0),
-        GrassStyle::STYLIZED,
+        GrassStyle::STYLIZED
+            .with_density(50.0)
+            .with_species(vec![GrassSpecies {
+                share: 0.1,
+                clustering: 1.,
+                blade: custom_blade,
+            }]),
         &mut styles,
     ));
-
-    // commands.spawn((
-    //     DirectionalLight {
-    //         illuminance: 10_000.0,
-    //         shadow_maps_enabled: true,
-    //         ..default()
-    //     },
-    //     Transform::from_xyz(8.0, 16.0, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
-    // ));
 }
 
 fn toggle_debug_render_collision(
