@@ -1,5 +1,5 @@
 use avian3d::prelude::*;
-use bevy::prelude::*;
+use bevy::{camera::Hdr, post_process::bloom::Bloom, prelude::*};
 use bevy_grass::prelude::*;
 use bevy_sky_gradient::prelude::*;
 
@@ -76,6 +76,7 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         .id();
 
     commands.spawn((
+        Camera::default(),
         Camera3d::default(),
         camera::SmartCamera {
             camera_subject: Some(player),
@@ -86,6 +87,13 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
             custom_mouse_lock_input: Some(camera::CameraInput::Keyboard(KeyCode::Escape)),
             can_zoom: true,
             max_distance: 30.0,
+            ..default()
+        },
+        Hdr,
+        Bloom {
+            intensity: 0.45,
+            low_frequency_boost: 0.7,
+            high_pass_frequency: 0.85,
             ..default()
         },
         SkyboxMagnetTag,

@@ -4,6 +4,10 @@ use bevy_grass::prelude::*;
 use bevy_sky_gradient::prelude::*;
 use player::PlayerPlugin;
 
+use crate::tunic::TunicPlugin;
+
+mod tunic;
+
 fn main() {
     App::new()
         .add_plugins((
@@ -31,6 +35,7 @@ fn main() {
                     },
                 })
                 .build(),
+            TunicPlugin,
         ))
         .add_plugins(PhysicsDebugPlugin)
         .insert_resource(GrassSettings {
