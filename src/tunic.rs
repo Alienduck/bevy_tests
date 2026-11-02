@@ -3,7 +3,7 @@ use bevy::{
     mesh::VertexAttributeValues,
     pbr::{MaterialPipeline, MaterialPipelineKey},
     prelude::*,
-    render::render_resource::{AsBindGroup, BlendState, Face, ShaderType},
+    render::render_resource::{AsBindGroup, ShaderType},
     shader::ShaderRef,
 };
 
@@ -20,34 +20,15 @@ impl Plugin for TunicPlugin {
 #[derive(ShaderType, Clone, Copy)]
 struct PrismParams {
     intensity: f32,
+    edge_thickness_px: f32,
+    smear_length: f32,
     dispersion: f32,
-    fresnel_power: f32,
-    edge_sharpness: f32,
-    smoke_density: f32,
-    smoke_speed: f32,
-    mode: f32,
-    core_opacity: f32,
 }
 
 #[derive(Asset, TypePath, AsBindGroup, Clone)]
-#[bind_group_data(PrismKey)]
 struct PrismMaterial {
     #[uniform(0)]
     params: PrismParams,
-    cull_mode: Option<Face>,
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-struct PrismKey {
-    cull_mode: Option<Face>,
-}
-
-impl From<&PrismMaterial> for PrismKey {
-    fn from(mat: &PrismMaterial) -> Self {
-        Self {
-            cull_mode: mat.cull_mode,
-        }
-    }
 }
 
 impl Material for PrismMaterial {
@@ -63,16 +44,9 @@ impl Material for PrismMaterial {
         _pipeline: &MaterialPipeline,
         descriptor: &mut RenderPipelineDescriptor,
         _layout: &bevy::render::mesh::MeshVertexBufferLayoutRef,
-        key: MaterialPipelineKey<Self>,
+        _key: MaterialPipelineKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
-        descriptor.primitive.cull_mode = key.bind_group_data.cull_mode;
-        if let Some(target) = descriptor
-            .fragment
-            .as_mut()
-            .and_then(|f| f.targets.get_mut(0).and_then(|t| t.as_mut()))
-        {
-            target.blend = Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING);
-        }
+        descriptor.primitive.cull_mode = None;
         Ok(())
     }
 }
@@ -111,105 +85,30 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<PrismMaterial>>,
 ) {
-    let pos = Vec3::new(0.0, 5., -4.0);
-    let base_rot = Quat::from_euler(EulerRot::XYZ, 0.35, 0.55, -0.2);
-    let mesh_handle = meshes.add(build_faceted_icosahedron(1.6));
+    let pos = Vec3::new(0.0, 5.5, -8.0);
 
     commands.spawn((
-        Mesh3d(mesh_handle.clone()),
+        Mesh3d(meshes.add(build_faceted_icosahedron(1.6))),
         MeshMaterial3d(materials.add(PrismMaterial {
             params: PrismParams {
-                intensity: 1.15,
-                dispersion: 0.16,
-                fresnel_power: 1.8,
-                edge_sharpness: 0.012,
-                smoke_density: 0.0,
-                smoke_speed: 0.25,
-                mode: 0.0,
-                core_opacity: 0.88,
+                intensity: 1.75,
+                edge_thickness_px: 1.6,
+                smear_length: 1.28,
+                dispersion: 1.,
             },
-            cull_mode: Some(Face::Front),
         })),
         Transform {
             translation: pos,
+            rotation: Quat::from_euler(EulerRot::XYZ, 0.35, 0.55, -0.2),
             scale: Vec3::splat(3.),
-            rotation: base_rot,
-        },
-        Rotate::default(),
-    ));
-
-    commands.spawn((
-        Mesh3d(mesh_handle.clone()),
-        MeshMaterial3d(materials.add(PrismMaterial {
-            params: PrismParams {
-                intensity: 1.65,
-                dispersion: 0.13,
-                fresnel_power: 2.1,
-                edge_sharpness: 0.016,
-                smoke_density: 0.0,
-                smoke_speed: 0.25,
-                mode: 0.0,
-                core_opacity: 0.35,
-            },
-            cull_mode: Some(Face::Back),
-        })),
-        Transform {
-            translation: pos,
-            scale: Vec3::splat(3.),
-            rotation: base_rot,
-        },
-        Rotate::default(),
-    ));
-
-    commands.spawn((
-        Mesh3d(mesh_handle.clone()),
-        MeshMaterial3d(materials.add(PrismMaterial {
-            params: PrismParams {
-                intensity: 1.1,
-                dispersion: 0.24,
-                fresnel_power: 2.8,
-                edge_sharpness: 0.01,
-                smoke_density: 0.0,
-                smoke_speed: 0.25,
-                mode: 2.0,
-                core_opacity: 0.0,
-            },
-            cull_mode: None,
-        })),
-        Transform {
-            translation: pos,
-            scale: Vec3::splat(3.032),
-            rotation: base_rot * Quat::from_euler(EulerRot::XYZ, 0.035, -0.04, 0.025),
-        },
-        Rotate::default(),
-    ));
-
-    commands.spawn((
-        Mesh3d(mesh_handle),
-        MeshMaterial3d(materials.add(PrismMaterial {
-            params: PrismParams {
-                intensity: 2.3,
-                dispersion: 0.20,
-                fresnel_power: 2.0,
-                edge_sharpness: 0.02,
-                smoke_density: 30.4,
-                smoke_speed: 0.85,
-                mode: 1.0,
-                core_opacity: 0.0,
-            },
-            cull_mode: Some(Face::Back),
-        })),
-        Transform {
-            translation: pos,
-            scale: Vec3::splat(3.1),
-            rotation: base_rot,
+            ..default()
         },
         Rotate::default(),
     ));
 
     commands.spawn((
         PointLight {
-            color: Color::srgb(0.75, 0.3, 1.0),
+            color: Color::srgb(0.8, 0.35, 1.0),
             intensity: 100_000.0,
             range: 18.0,
             shadow_maps_enabled: true,
@@ -222,5 +121,6 @@ fn setup(
 fn rotate(prism_q: Query<(&mut Transform, &Rotate)>, time: Res<Time>) {
     for (mut transform, rotation) in prism_q {
         transform.rotate_x(1. * rotation.speed * time.delta_secs());
+        transform.rotate_z(0.44 * rotation.speed * time.delta_secs());
     }
 }
